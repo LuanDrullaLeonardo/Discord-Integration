@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { cn } from '@/utils/cn'
 import {
-  LayoutDashboard, Users, CalendarDays, Target, Palmtree, LogOut, ChevronLeft, ChevronRight
+  LayoutDashboard, Users, CalendarDays, Target, Palmtree, Calendar, LogOut, ChevronLeft, ChevronRight
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -27,6 +27,11 @@ const navItems = computed(() => {
       to: '/vacations',
       label: 'Férias',
       icon: Palmtree,
+    },
+    {
+      to: '/calendar',
+      label: 'Calendário',
+      icon: Calendar,
     },
   ]
   if (auth.isAdminOrRH) {
