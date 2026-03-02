@@ -71,37 +71,19 @@ async function gerarArquivoExcel(ano, mes) {
 async function gerarArquivoPDF(ano, mes) {
   const resumos = await calcularTodosResumosMensais(ano, mes);
 
-  const doc = new PDFDocument({ 
-    size: "A4", 
+  const doc = new PDFDocument({
+    size: "A4",
     margin: 40,
-    bufferPages: false // Desabilitado para evitar páginas extras
+    bufferPages: true, // Necessário para adicionar footers depois sem criar páginas extras
+    autoFirstPage: true
   });
-  
+
   const stream = doc.pipe(require("stream").PassThrough());
-
-  let pageNumber = 1;
-
-  // Helper para adicionar footer
-  const addFooter = () => {
-    const bottom = doc.page.height - 30;
-    doc.fontSize(8)
-      .fillColor('#999999')
-      .text(
-        `Pagina ${pageNumber}`,
-        40,
-        bottom,
-        { align: 'center', width: doc.page.width - 80 }
-      );
-  };
 
   // Helper para verificar se precisa de nova página
   const checkPageBreak = (requiredSpace = 140) => {
-    // Só quebra página se realmente não couber (margem de 80px do rodapé)
-    if (doc.y + requiredSpace > doc.page.height - 80) {
-      addFooter();
+    if (doc.y + requiredSpace > doc.page.height - 60) {
       doc.addPage();
-      pageNumber++;
-      // Reseta para o topo da nova página
       doc.y = 50;
       return true;
     }
@@ -297,10 +279,22 @@ async function gerarArquivoPDF(ano, mes) {
     doc.y = boxStartY + boxHeight + 12;
   });
 
-  // Adiciona footer na última página
-  addFooter();
+  // Adiciona footers em todas as páginas de uma só vez (bufferPages: true)
+  const totalPages = doc.bufferedPageRange().count;
+  for (let i = 0; i < totalPages; i++) {
+    doc.switchToPage(i);
+    doc.fontSize(8)
+      .fillColor('#999999')
+      .text(
+        `Pagina ${i + 1}`,
+        40,
+        doc.page.height - 30,
+        { align: 'center', width: doc.page.width - 80 }
+      );
+  }
 
-  // Finaliza o documento
+  // Finaliza o documento (flushPages obrigatório com bufferPages: true)
+  doc.flushPages();
   doc.end();
   const buffer = await getStream.buffer(stream);
   return buffer;
@@ -343,39 +337,22 @@ async function enviarEmailRelatorio(adminEmail, bufferExcel, bufferPDF, ano, mes
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: #4472C4; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0;">📊 Relatório Mensal</h1>
-          <p style="margin: 10px 0 0 0; font-size: 18px;">${meses[mes - 1]} de ${ano}</p>
+          <h1 style="margin: 0; font-size: 22px;">📊 Relatório Mensal</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px;">${meses[mes - 1]} de ${ano}</p>
         </div>
-        
-        <div style="padding: 30px; background: #f5f5f5;">
-          <p style="font-size: 16px; color: #333;">Olá,</p>
-          
-          <p style="font-size: 14px; color: #666; line-height: 1.6;">
-            Segue em anexo o relatório detalhado de horas trabalhadas referente ao mês de <strong>${meses[mes - 1]}/${ano}</strong>.
+
+        <div style="padding: 28px; background: #f5f5f5;">
+          <p style="font-size: 14px; color: #333; margin: 0 0 16px 0;">
+            Segue em anexo o relatório de horas trabalhadas de <strong>${meses[mes - 1]}/${ano}</strong>, com os arquivos PDF e Excel.
           </p>
 
-          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4472C4;">
-            <h3 style="margin: 0 0 15px 0; color: #4472C4;">📋 Arquivos incluídos:</h3>
-            <ul style="color: #666; line-height: 1.8;">
-              <li><strong>PDF:</strong> Relatório completo com formatação visual e legendas explicativas</li>
-              <li><strong>Excel:</strong> Planilha para análise e processamento dos dados</li>
-            </ul>
-          </div>
-
-          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-            <p style="margin: 0; color: #856404; font-size: 13px;">
-              <strong>ℹ️ Novidade:</strong> O relatório agora inclui o <strong>Banco de Horas Acumulado</strong> dos últimos 6 meses e o <strong>Saldo Total</strong> de cada colaborador.
-            </p>
-          </div>
-
-          <p style="font-size: 13px; color: #999; margin-top: 30px;">
-            Este é um e-mail automático. Em caso de dúvidas, entre em contato com o RH.
+          <p style="font-size: 13px; color: #999; margin: 0;">
+            Este é um e-mail automático gerado em ${new Date().toLocaleDateString('pt-BR')}.
           </p>
         </div>
-        
-        <div style="background: #333; color: #999; padding: 15px; text-align: center; font-size: 12px; border-radius: 0 0 10px 10px;">
-          <p style="margin: 0;">Pontobot © ${ano} - Sistema de Controle de Ponto</p>
-          <p style="margin: 5px 0 0 0;">Gerado automaticamente em ${new Date().toLocaleDateString('pt-BR')}</p>
+
+        <div style="background: #333; color: #999; padding: 12px; text-align: center; font-size: 12px; border-radius: 0 0 10px 10px;">
+          Pontobot © ${ano} — Sistema de Controle de Ponto
         </div>
       </div>
     `,

@@ -84,7 +84,10 @@ async function getTipoDeDia(dataStr, discordId = null) {
       const usuarios = dados.usuarios || [];
 
       if (usuarios.length === 0 || usuarios.includes(discordId)) {
-        return "feriado";
+        const tipo = dados.tipo || "feriado";
+        // ponto-facultativo e outro não removem o dia da meta de horas
+        if (tipo === "feriado") return "feriado";
+        return "util";
       }
     }
   } catch (err) {
@@ -95,12 +98,13 @@ async function getTipoDeDia(dataStr, discordId = null) {
   return "util";
 }
 
-async function contarDiasUteisValidos(ano, mes, discordId) {
+async function contarDiasUteisValidos(ano, mes, discordId, diasFerias = new Set()) {
   const totalDias = dayjs(`${ano}-${String(mes).padStart(2, "0")}-01`).daysInMonth();
   let diasUteis = 0;
 
   for (let dia = 1; dia <= totalDias; dia++) {
     const dataAtual = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+    if (diasFerias.has(dataAtual)) continue; // dia de férias aprovadas não conta na meta
     const tipo = await getTipoDeDia(dataAtual, discordId);
     if (tipo === "util") diasUteis++;
   }

@@ -11,14 +11,17 @@ exports.getDatasEspeciais = async (req, res) => {
   }
 };
 
+const TIPOS_VALIDOS = ["feriado", "ponto-facultativo", "outro"];
+
 exports.addDataEspecial = async (req, res) => {
   try {
-    const { data, nome, usuarios = [] } = req.body;
+    const { data, nome, tipo = "feriado", usuarios = [] } = req.body;
     if (!data || !nome) {
       return res.status(400).json({ error: "Campos obrigatórios: data e nome" });
     }
 
-    await db.collection("datas_especiais").doc(data).set({ data, nome, usuarios });
+    const tipoFinal = TIPOS_VALIDOS.includes(tipo) ? tipo : "feriado";
+    await db.collection("datas_especiais").doc(data).set({ data, nome, tipo: tipoFinal, usuarios });
     res.json({ success: true, message: "Data especial adicionada com sucesso" });
   } catch (error) {
     console.error("Erro ao adicionar data especial:", error);

@@ -73,11 +73,13 @@ exports.calcularBancoAcumulado = async (discordId, ano, mes) => {
   try {
     const mesAnoAtual = `${ano}-${String(mes).padStart(2, '0')}`;
     
-    // Busca todos os registros anteriores ao mês atual
+    // Busca todos os registros até o mês atual (inclusive)
+    // O doc do mês atual é salvo com o mês seguinte como chave (fechamento no dia 01),
+    // então <= inclui corretamente o último fechamento disponível
     const snapshot = await db.collection('banco_horas')
       .doc(discordId)
       .collection('historico')
-      .where('mesAno', '<', mesAnoAtual)
+      .where('mesAno', '<=', mesAnoAtual)
       .orderBy('mesAno', 'asc')
       .get();
 
@@ -165,23 +167,24 @@ exports.limparHistoricoAntigo = async (discordId) => {
 
 /**
  * Fecha o mês atual e persiste o banco de horas
- * (Deve ser executado no fim de cada mês)
+ * (Deve ser executado no dia 01 do mês seguinte)
+ * O doc é salvo com a chave do mês atual (ex: fechamento em 01/03 salva como 2026-03)
  * @param {string} discordId - Discord ID do usuário
  * @param {Object} resumoMensal - Resumo mensal calculado
  * @returns {Promise<void>}
  */
 exports.fecharMes = async (discordId, resumoMensal) => {
   try {
-    const hoje = dayjs();
-    const ano = hoje.year();
-    const mes = hoje.month() + 1;
+    // Usa o mês atual do dia em que o script roda (dia 01 do mês seguinte)
+    const ano = dayjs().year();
+    const mes = dayjs().month() + 1;
 
     // Pega o saldo atual do mês
     const saldoAtualMinutos = extrairMinutosDeString(resumoMensal.saldo);
-    
+
     // Pega o banco acumulado anterior
     const bancoAnterior = await exports.calcularBancoAcumulado(discordId, ano, mes);
-    
+
     // Calcula o novo saldo total
     const novoSaldoTotal = bancoAnterior + saldoAtualMinutos;
 

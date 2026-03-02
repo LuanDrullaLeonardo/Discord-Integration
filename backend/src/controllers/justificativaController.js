@@ -1,26 +1,42 @@
 const db = require("../config/firebase");
-const nodemailer = require("nodemailer");
-const { calcularHorasTrabalhadas, extrairMinutosDeString, formatarMinutosParaHoras } = require("../utils/timeUtils");
+const { extrairMinutosDeString, formatarMinutosParaHoras } = require("../utils/timeUtils");
 const { enviarEmailNotificacao, enviarEmailConfirmacaoLeitor } = require("../utils/emailHelper");
 
 /**
- * Esse endpoint espera um body com:
- * - usuario: (string) para identificar o registro (ex.: "usuario")
- * - data: (string) data do registro (ex.: "2025-03-20")
- * - text: (string) o texto da justificativa
- * - newEntry: (string) data/hora da entrada manual (opcional)
- * - newExit: (string) data/hora da saída manual (opcional)
- * - status: (string) opcional, somente considerado se o usuário for admin
- * 
- * Observação: Para saber a role do usuário, é ideal ter um middleware de autenticação
- * que verifique o token do Firebase e disponibilize essa informação em req.user.
- * Aqui, usamos req.user.role como exemplo. Se não houver, assume "leitor".
+ * Tipos válidos de justificativa:
+ * - abono_parcial: abona a diferença entre meta e horas trabalhadas
+ * - abono_dia: abona o dia inteiro (meta completa do usuário)
+ * - horas_extras: registra o excedente positivo no banco
+ * - informativo: sem impacto no saldo
  */
+const TIPOS_VALIDOS = ["abono_parcial", "abono_dia", "horas_extras", "informativo"];
 
 async function getUserRole(email) {
   const snapshot = await db.collection("users").where("email", "==", email).get();
   if (snapshot.empty) return "leitor";
   return snapshot.docs[0].data().role || "leitor";
+}
+
+async function getMetaHorasDia(discordId, data) {
+  const prefixoData = data.slice(0, 7); // "YYYY-MM"
+  try {
+    const userSnapshot = await db.collection("users").where("discordId", "==", discordId).limit(1).get();
+    if (userSnapshot.empty) return 8;
+    const metasDoc = await userSnapshot.docs[0].ref.collection("metas").doc(prefixoData).get();
+    if (metasDoc.exists && metasDoc.data().metaHorasDia) {
+      return metasDoc.data().metaHorasDia;
+    }
+  } catch (err) {
+    console.warn("⚠️ Erro ao buscar meta personalizada:", err.message);
+  }
+  return 8;
+}
+
+function calcularAbonoMinutos(tipo, minutosTrabalhados, jornadaBase) {
+  if (tipo === "abono_parcial") return Math.max(0, jornadaBase - minutosTrabalhados);
+  if (tipo === "abono_dia") return jornadaBase;
+  if (tipo === "horas_extras") return Math.max(0, minutosTrabalhados - jornadaBase);
+  return 0; // informativo
 }
 
 exports.deleteJustificativa = async (req, res) => {
@@ -58,11 +74,11 @@ exports.deleteJustificativa = async (req, res) => {
     console.error("Erro ao deletar justificativa:", error);
     return res.status(500).json({ error: "Erro ao deletar justificativa." });
   }
-}
+};
 
 exports.upsertJustificativa = async (req, res) => {
   try {
-    const { usuario, data, text, newEntry, newExit, abonoHoras, status, file, fileName, manualBreak, observacaoAdmin } = req.body;
+    const { usuario, data, text, tipo, status, file, fileName, observacaoAdmin } = req.body;
 
     const email = req.user.email;
     const userRole = await getUserRole(email);
@@ -80,64 +96,40 @@ exports.upsertJustificativa = async (req, res) => {
     const registroAtual = doc.data();
     const justificativaAntiga = registroAtual.justificativa || {};
 
+    // Preserva tipo existente se não vier um novo válido
+    const tipoDefinitivo = (TIPOS_VALIDOS.includes(tipo) ? tipo : null) ?? justificativaAntiga.tipo ?? null;
+
+    // abonoHoras é calculado automaticamente na aprovação, não preenchido manualmente
+    let abonoHoras = justificativaAntiga.abonoHoras ?? null;
+
+    if (justificativaStatus === "aprovado" && tipoDefinitivo && tipoDefinitivo !== "informativo") {
+      const metaHorasDia = await getMetaHorasDia(registroAtual.discordId, data);
+      const jornadaBase = metaHorasDia * 60;
+      const minutosTrabalhados = extrairMinutosDeString(registroAtual.total_horas || "0h 0m");
+      const abonoMinutos = calcularAbonoMinutos(tipoDefinitivo, minutosTrabalhados, jornadaBase);
+      abonoHoras = abonoMinutos > 0 ? formatarMinutosParaHoras(abonoMinutos) : null;
+    }
+
+    // Na reprovação, limpa qualquer abono anterior
+    if (justificativaStatus === "reprovado") {
+      abonoHoras = null;
+    }
+
     const justificativa = {
       text,
+      tipo: tipoDefinitivo,
       status: justificativaStatus,
-      newEntry: newEntry || justificativaAntiga.newEntry || null,
-      newExit: newExit || justificativaAntiga.newExit || null,
-      abonoHoras: abonoHoras?.trim() ?? justificativaAntiga.abonoHoras ?? null,
-      manualBreak: manualBreak?.trim() ?? justificativaAntiga.manualBreak ?? null,
+      abonoHoras,
       updatedAt: new Date().toISOString(),
       file: file ?? justificativaAntiga.file ?? null,
       fileName: fileName ?? justificativaAntiga.fileName ?? null,
       observacaoAdmin: observacaoAdmin?.trim() ?? justificativaAntiga.observacaoAdmin ?? null,
     };
 
-    const atualizacao = { justificativa };
-
-    if (justificativaStatus === "aprovado" && (newEntry || newExit)) {
-      const entrada = newEntry
-        ? new Date(newEntry).toTimeString().slice(0, 5)
-        : registroAtual.entrada;
-
-      const saida = newExit
-        ? new Date(newExit).toTimeString().slice(0, 5)
-        : registroAtual.saida;
-
-      const dataFormatada = data;
-      const pausas = registroAtual.pausas || [];
-
-      const pausasCalculadas = manualBreak
-        ? extrairMinutosDeString(manualBreak)
-        : (() => {
-          const { totalPausas } = calcularHorasTrabalhadas(
-            `${dataFormatada}T${entrada}:00`,
-            `${dataFormatada}T${saida}:00`,
-            pausas
-          );
-          return extrairMinutosDeString(totalPausas);
-        })();
-
-      const minutosTotais = extrairMinutosDeString(
-        calcularHorasTrabalhadas(
-          `${dataFormatada}T${entrada}:00`,
-          `${dataFormatada}T${saida}:00`,
-          []
-        ).totalHoras
-      );
-
-      const horasTrabalhadas = minutosTotais - pausasCalculadas;
-
-      atualizacao.entrada = entrada;
-      atualizacao.saida = saida;
-      atualizacao.total_horas = formatarMinutosParaHoras(horasTrabalhadas);
-      atualizacao.total_pausas = formatarMinutosParaHoras(pausasCalculadas);
-    }
+    await registroRef.set({ justificativa }, { merge: true });
 
     if (justificativaStatus === "pendente") await enviarEmailNotificacao(justificativa, usuario, data);
     if (["aprovado", "reprovado"].includes(justificativaStatus)) await enviarEmailConfirmacaoLeitor(justificativa, usuario, data, justificativaStatus);
-
-    await registroRef.set(atualizacao, { merge: true });
 
     const io = req.app.get("io");
     io.emit("registro-atualizado", { usuario, data });

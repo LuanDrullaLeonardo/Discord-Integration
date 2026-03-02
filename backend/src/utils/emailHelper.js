@@ -28,10 +28,7 @@ async function enviarEmailNotificacao(justificativa, usuario, data) {
       <h2 style="color: #5a40b6;">📥 Nova Justificativa Recebida</h2>
       <p><strong>Usuário:</strong> ${usuario}</p>
       <p><strong>Data:</strong> ${data}</p>
-      ${justificativa.newEntry ? `<p><strong>Entrada Manual:</strong> ${justificativa.newEntry}</p>` : ''}
-      ${justificativa.newExit ? `<p><strong>Saída Manual:</strong> ${justificativa.newExit}</p>` : ''}
-      ${justificativa.abonoHoras ? `<p><strong>Abono de Horas:</strong> ${justificativa.abonoHoras}</p>` : ''}
-      ${justificativa.manualBreak ? `<p><strong>Intervalo Manual:</strong> ${justificativa.manualBreak}</p>` : ''}
+      ${justificativa.tipo ? `<p><strong>Tipo:</strong> ${{ abono_parcial: 'Abono de horas faltantes', abono_dia: 'Abono do dia inteiro', horas_extras: 'Horas extras', informativo: 'Informativo' }[justificativa.tipo] || justificativa.tipo}</p>` : ''}
       <p><strong>Descrição:</strong></p>
       <blockquote style="background: #eee; padding: 10px; border-left: 4px solid #5a40b6;">${justificativa.text}</blockquote>
       ${justificativa.fileName ? `
@@ -107,6 +104,7 @@ async function enviarEmailConfirmacaoLeitor(justificativa, usuario, data, status
       <p><strong>Status:</strong> ${status === "aprovado" ? "✅ Aprovada" : "❌ Reprovada"}</p>
       <p><strong>Justificativa enviada:</strong></p>
       <blockquote style="background: #eee; padding: 10px; border-left: 4px solid #5a40b6;">${justificativa.text}</blockquote>
+      ${status === "aprovado" && justificativa.abonoHoras ? `<p><strong>Horas abonadas:</strong> ${justificativa.abonoHoras}</p>` : ''}
       ${justificativa.observacaoAdmin ? `
         <p><strong>Observação do Administrador:</strong></p>
         <blockquote style="background: #f1f1f1; padding: 10px; border-left: 4px solid #5a40b6;">${justificativa.observacaoAdmin}</blockquote>

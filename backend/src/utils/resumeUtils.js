@@ -1,6 +1,7 @@
 const db = require("../config/firebase");
 const { extrairMinutosDeString, getTipoDeDia, formatarMinutosParaHoras, contarDiasUteisValidos } = require("./timeUtils");
 const bancoHorasService = require("../services/bancoHoras.service");
+const { getDiasFerias } = require("../controllers/feriasController");
 
 async function calcularResumoMensal(discordId, ano, mes) {
   const prefixoData = `${ano}-${String(mes).padStart(2, "0")}`;
@@ -24,18 +25,23 @@ async function calcularResumoMensal(discordId, ano, mes) {
 
   for (const reg of registros) {
     const minutos = extrairMinutosDeString(reg.total_horas);
+    const abono = (reg.justificativa?.status === "aprovado")
+      ? extrairMinutosDeString(reg.justificativa.abonoHoras || "0h 0m")
+      : 0;
+    const minutosTotaisDia = minutos + abono;
     const tipo = await getTipoDeDia(reg.data);
 
-    if (tipo === "sabado") extras.sabado += minutos;
-    else if (tipo === "domingo" || tipo === "feriado") extras.domingo_feriado += minutos;
-    else extras.util += minutos;
+    if (tipo === "sabado") extras.sabado += minutosTotaisDia;
+    else if (tipo === "domingo" || tipo === "feriado") extras.domingo_feriado += minutosTotaisDia;
+    else extras.util += minutosTotaisDia;
 
-    totalMinutos += minutos;
+    totalMinutos += minutosTotaisDia;
     if (reg.justificativa?.status === "pendente") pendentes++;
     if (reg.justificativa?.status === "aprovado") aprovadas++;
   }
 
-  const diasUteis = await contarDiasUteisValidos(ano, mes, discordId);
+  const diasFerias = await getDiasFerias(discordId, ano, mes);
+  const diasUteis = await contarDiasUteisValidos(ano, mes, discordId, diasFerias);
   let metaMinutos = diasUteis * 8 * 60;
 
   try {
