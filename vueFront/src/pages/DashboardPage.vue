@@ -235,6 +235,7 @@ onUnmounted(() => {
           :search="searchQuery"
           :date-start="dateStart"
           :date-end="dateEnd"
+          :meta-horas-dia="metaHorasDia"
           @update:search="searchQuery = $event"
           @update:dateStart="dateStart = $event"
           @update:dateEnd="dateEnd = $event"

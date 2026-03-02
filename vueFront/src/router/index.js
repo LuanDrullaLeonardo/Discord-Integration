@@ -45,6 +45,11 @@ const routes = [
         component: () => import('@/pages/admin/ManageHolidaysPage.vue'),
         meta: { requiresAdmin: true },
       },
+      {
+        path: 'vacations',
+        name: 'vacations',
+        component: () => import('@/pages/VacationsPage.vue'),
+      },
     ],
   },
   {

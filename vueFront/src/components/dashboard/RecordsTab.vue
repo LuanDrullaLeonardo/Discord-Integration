@@ -22,6 +22,7 @@ const props = defineProps({
   search: String,
   dateStart: String,
   dateEnd: String,
+  metaHorasDia: { type: Number, default: 8 },
 })
 const emit = defineEmits(['update:search', 'update:dateStart', 'update:dateEnd', 'refresh', 'load-more'])
 
@@ -160,8 +161,15 @@ const statusLabel = (record) => {
                   {{ record.hora_entrada ?? '—' }}
                 </td>
                 <!-- Hora saída -->
-                <td class="px-4 py-3 font-mono" :class="record.hora_saida ? 'text-foreground' : 'text-muted-foreground'">
-                  {{ record.hora_saida ?? '—' }}
+                <td class="px-4 py-3 font-mono">
+                  <span v-if="record.hora_saida && record.hora_saida !== '-'" class="text-foreground">
+                    {{ record.hora_saida }}
+                  </span>
+                  <span v-else-if="record.hora_saida_ideal" class="text-muted-foreground" :title="`Saída ideal com base na meta de ${metaHorasDia}h/dia`">
+                    {{ record.hora_saida_ideal }}
+                    <span class="text-xs ml-0.5 opacity-60">*</span>
+                  </span>
+                  <span v-else class="text-muted-foreground">—</span>
                 </td>
                 <!-- Total horas -->
                 <td class="px-4 py-3 font-mono text-foreground">
@@ -216,6 +224,11 @@ const statusLabel = (record) => {
             </template>
           </tbody>
         </table>
+
+        <!-- Legenda saída ideal -->
+        <div v-if="records.some(r => r.hora_saida_ideal)" class="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+          <span class="opacity-60">*</span> Saída estimada com base na meta de {{ metaHorasDia }}h/dia
+        </div>
 
         <!-- Load more -->
         <div v-if="hasMore || loadingMore" class="border-t border-border px-4 py-3 flex items-center justify-center">

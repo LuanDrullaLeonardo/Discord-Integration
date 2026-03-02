@@ -10,10 +10,11 @@ export async function fetchSpecialDates() {
   return data
 }
 
-export async function addSpecialDate({ data: dataParam, descricao, nome, tipo, usuarios = [] }) {
+export async function addSpecialDate({ data: dataParam, descricao, nome, tipo = 'feriado', usuarios = [] }) {
   const { data } = await api.post('/datas-especiais', {
     data: dataParam,
     nome: nome ?? descricao,
+    tipo,
     usuarios,
   })
   return data

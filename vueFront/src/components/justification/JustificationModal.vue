@@ -1,8 +1,9 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import { upsertJustificativa, deleteJustificativa, uploadJustificativaFile } from '@/services/justificativaService'
+import { extrairMinutosDeString, formatarMinutosParaHoras } from '@/utils/timeUtils'
 import Button from '@/components/ui/Button.vue'
 import Label from '@/components/ui/Label.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -17,20 +18,58 @@ const emit = defineEmits(['close', 'saved'])
 const auth = useAuthStore()
 const { toast } = useToast()
 
-// O backend salva o campo como "text", não "texto"
+const TIPOS = [
+  { value: 'abono_parcial', label: 'Abono de horas faltantes', desc: 'Abona a diferença entre o trabalhado e a meta do dia' },
+  { value: 'abono_dia',     label: 'Abono do dia inteiro',     desc: 'Considera o dia completo como cumprido (atestado, folga etc.)' },
+  { value: 'horas_extras',  label: 'Horas extras',             desc: 'Registra o excedente positivo no banco de horas' },
+  { value: 'informativo',   label: 'Apenas informativo',       desc: 'Sem impacto no saldo de horas' },
+]
+
+const TIPO_LABELS = Object.fromEntries(TIPOS.map(t => [t.value, t.label]))
+
 const texto = ref(props.record.justificativa?.text ?? '')
+const tipo = ref(props.record.justificativa?.tipo ?? '')
 const observacaoAdmin = ref(props.record.justificativa?.observacaoAdmin ?? '')
 const file = ref(null)
 const loading = ref(false)
 const deleting = ref(false)
+const erros = ref({ texto: false, tipo: false })
+
+// Preview do abono estimado (calculado localmente para o admin/leitor entender o impacto)
+const previewAbono = computed(() => {
+  if (!tipo.value || tipo.value === 'informativo') return null
+  const saldoMin = props.record.banco_horas_min ?? 0
+  // banco_horas_min já é (trabalhado - meta), então:
+  // déficit = saldo negativo, excedente = saldo positivo
+  if (tipo.value === 'abono_parcial') {
+    const deficit = Math.max(0, -saldoMin)
+    return deficit > 0 ? formatarMinutosParaHoras(deficit) : null
+  }
+  if (tipo.value === 'abono_dia') {
+    // meta = trabalhado - saldo
+    const trabalhado = extrairMinutosDeString(props.record.total_horas || '0h 0m')
+    const meta = trabalhado - saldoMin
+    return meta > 0 ? formatarMinutosParaHoras(meta) : null
+  }
+  if (tipo.value === 'horas_extras') {
+    const excedente = Math.max(0, saldoMin)
+    return excedente > 0 ? formatarMinutosParaHoras(excedente) : null
+  }
+  return null
+})
 
 const handleFileChange = (e) => {
   file.value = e.target.files[0] ?? null
 }
 
 const handleSave = async () => {
-  if (!texto.value.trim()) {
-    toast({ type: 'warning', title: 'Atenção', message: 'Descreva a justificativa.' })
+  // Leitor: texto e tipo são obrigatórios
+  // Admin: apenas texto é obrigatório (tipo já foi definido pelo leitor)
+  erros.value.texto = !texto.value.trim()
+  erros.value.tipo = !auth.isAdminOrRH && !tipo.value
+
+  if (erros.value.texto || erros.value.tipo) {
+    toast({ type: 'warning', title: 'Atenção', message: 'Preencha os campos obrigatórios.' })
     return
   }
 
@@ -45,6 +84,7 @@ const handleSave = async () => {
     await upsertJustificativa({
       registroId: props.record.id,
       texto: texto.value,
+      tipo: tipo.value || undefined,
       fileUrl,
     })
 
@@ -60,7 +100,8 @@ const handleSave = async () => {
 
 // Admin/RH: altera status da justificativa
 const handleStatusChange = async (status) => {
-  if (!texto.value.trim()) {
+  erros.value.texto = !texto.value.trim()
+  if (erros.value.texto) {
     toast({ type: 'warning', title: 'Atenção', message: 'Descreva a justificativa antes de alterar o status.' })
     return
   }
@@ -135,15 +176,73 @@ const statusVariant = (s) => {
             </Badge>
           </div>
 
+          <!-- Saldo do dia (contexto visual) -->
+          <div class="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
+            <span class="text-muted-foreground">Saldo do dia:</span>
+            <span
+              class="font-mono font-semibold"
+              :class="(record.banco_horas_min ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+            >
+              {{ record.banco_horas ?? '—' }}
+            </span>
+          </div>
+
+          <!-- Tipo (leitor seleciona; admin vê read-only) -->
+          <div class="space-y-1.5">
+            <Label>Tipo de justificativa</Label>
+            <template v-if="!auth.isAdminOrRH">
+              <select
+                v-model="tipo"
+                @change="erros.tipo = false"
+                class="flex w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                :class="erros.tipo ? 'border-red-500 focus-visible:ring-red-500' : 'border-input'"
+              >
+                <option value="" disabled class="bg-background text-muted-foreground">Selecione o tipo...</option>
+                <option v-for="t in TIPOS" :key="t.value" :value="t.value" class="bg-background text-foreground">{{ t.label }}</option>
+              </select>
+              <p v-if="erros.tipo" class="text-xs text-red-500">Selecione o tipo da justificativa.</p>
+              <p v-else-if="tipo" class="text-xs text-muted-foreground">
+                {{ TIPOS.find(t => t.value === tipo)?.desc }}
+              </p>
+            </template>
+            <template v-else>
+              <p class="text-sm font-medium text-foreground">
+                {{ record.justificativa?.tipo ? TIPO_LABELS[record.justificativa.tipo] : '—' }}
+              </p>
+            </template>
+          </div>
+
+          <!-- Preview do abono estimado -->
+          <div
+            v-if="previewAbono"
+            class="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 px-3 py-2 text-sm"
+          >
+            <span class="text-blue-700 dark:text-blue-300">
+              <template v-if="tipo === 'horas_extras'">Horas extras a creditar ao aprovar:</template>
+              <template v-else>Horas a abonar ao aprovar:</template>
+            </span>
+            <span class="font-mono font-semibold text-blue-800 dark:text-blue-200 ml-1">{{ previewAbono }}</span>
+          </div>
+          <div
+            v-else-if="tipo && tipo !== 'informativo' && !previewAbono"
+            class="rounded-md border border-muted px-3 py-2 text-xs text-muted-foreground"
+          >
+            <template v-if="tipo === 'horas_extras'">Nenhum excedente detectado neste dia.</template>
+            <template v-else>Sem diferença a abonar neste dia.</template>
+          </div>
+
           <!-- Texto -->
           <div class="space-y-1.5">
             <Label>Descrição</Label>
             <textarea
               v-model="texto"
-              rows="4"
-              class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+              @input="erros.texto = false"
+              rows="3"
+              class="flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+              :class="erros.texto ? 'border-red-500 focus-visible:ring-red-500' : 'border-input'"
               placeholder="Descreva o motivo da justificativa..."
             />
+            <p v-if="erros.texto" class="text-xs text-red-500">Descreva o motivo da justificativa.</p>
           </div>
 
           <!-- Arquivo (apenas leitores) -->
@@ -160,6 +259,12 @@ const statusVariant = (s) => {
 
           <!-- Campos exclusivos do Admin/RH -->
           <template v-if="auth.isAdminOrRH">
+            <!-- Abono já calculado (se aprovado) -->
+            <div v-if="record.justificativa?.status === 'aprovado' && record.justificativa?.abonoHoras" class="rounded-md border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800 px-3 py-2 text-sm">
+              <span class="text-green-700 dark:text-green-300">Abono aplicado:</span>
+              <span class="font-mono font-semibold text-green-800 dark:text-green-200 ml-1">{{ record.justificativa.abonoHoras }}</span>
+            </div>
+
             <!-- Observação do admin -->
             <div class="space-y-1.5">
               <Label>Observação (admin)</Label>
@@ -226,7 +331,7 @@ const statusVariant = (s) => {
 
           <div class="flex gap-2">
             <Button variant="outline" size="sm" @click="emit('close')">Cancelar</Button>
-            <!-- Leitor salva direto; admin usa botões de status mas pode salvar só o texto -->
+            <!-- Leitor salva com tipo; admin usa botões de status mas pode salvar observação -->
             <Button size="sm" :loading="loading" @click="handleSave">
               {{ auth.isAdminOrRH ? 'Salvar texto' : 'Salvar' }}
             </Button>

@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Badge from '@/components/ui/Badge.vue'
 import { CalendarDays, Plus, Trash2 } from 'lucide-vue-next'
 import dayjs from 'dayjs'
 
@@ -34,6 +35,18 @@ const loadDates = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const TIPO_VARIANT = {
+  'feriado': 'destructive',
+  'ponto-facultativo': 'warning',
+  'outro': 'secondary',
+}
+
+const TIPO_LABEL = {
+  'feriado': 'Feriado',
+  'ponto-facultativo': 'Ponto Facultativo',
+  'outro': 'Outro',
 }
 
 const handleAdd = async () => {
@@ -125,9 +138,14 @@ const handleDelete = async (item) => {
           class="flex items-center justify-between px-4 py-3 hover:bg-muted/30"
         >
           <div>
-            <p class="text-sm font-medium text-foreground">{{ item.descricao }}</p>
-            <p class="text-xs text-muted-foreground">
-              {{ dayjs(item.data).format('DD/MM/YYYY') }} · {{ item.tipo }}
+            <div class="flex items-center gap-2">
+              <p class="text-sm font-medium text-foreground">{{ item.descricao }}</p>
+              <Badge :variant="TIPO_VARIANT[item.tipo] ?? 'secondary'" class="text-xs">
+                {{ TIPO_LABEL[item.tipo] ?? item.tipo }}
+              </Badge>
+            </div>
+            <p class="text-xs text-muted-foreground mt-0.5">
+              {{ dayjs(item.data).format('DD/MM/YYYY') }}
             </p>
           </div>
           <Button

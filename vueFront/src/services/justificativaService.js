@@ -13,13 +13,14 @@ function parseRegistroId(registroId) {
 // DELETE /justificativa
 // POST /upload-justificativa
 
-export async function upsertJustificativa({ registroId, texto, fileUrl, status, observacaoAdmin }) {
+export async function upsertJustificativa({ registroId, texto, tipo, fileUrl, status, observacaoAdmin }) {
   const { usuario, data } = parseRegistroId(registroId)
   const payload = {
     usuario,
     data,
     text: texto,
   }
+  if (tipo !== undefined) payload.tipo = tipo
   if (fileUrl !== undefined) payload.file = fileUrl
   if (status !== undefined) payload.status = status
   if (observacaoAdmin !== undefined) payload.observacaoAdmin = observacaoAdmin

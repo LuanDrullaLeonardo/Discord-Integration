@@ -14,6 +14,16 @@ dayjs.locale('pt-br')
 
 export const PAGE_SIZE = 20
 
+function calcularSaidaIdeal(entrada, pausasMinutos, metaHorasDia) {
+  if (!entrada || entrada === '-') return null
+  const [h, m] = entrada.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return null
+  const totalMin = h * 60 + m + metaHorasDia * 60 + pausasMinutos
+  const hh = Math.floor(totalMin / 60) % 24
+  const mm = totalMin % 60
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
 function mapDoc(doc, metaHorasDia = 8) {
   const d = doc.data()
   const entrada = d.entrada
@@ -39,6 +49,16 @@ function mapDoc(doc, metaHorasDia = 8) {
     bancoHoras = formatarMinutosParaHoras(saldoMinutos)
   }
 
+  // Saída ideal: só calculada quando há entrada mas ainda não há saída (registro em aberto)
+  // e é dia útil (não sábado/domingo)
+  const diaSemana = dayjs(d.data).day()
+  const ehDiaUtil = diaSemana !== 0 && diaSemana !== 6
+  const emAberto = entrada && entrada !== '-' && (!saida || saida === '-')
+  const pausasMinutos = extrairMinutosDeString(formatarTotalPausas(d.total_pausas))
+  const hora_saida_ideal = (emAberto && ehDiaUtil)
+    ? calcularSaidaIdeal(entrada, pausasMinutos, metaHorasDia)
+    : null
+
   return {
     id: doc.id,
     usuario: d.usuario,
@@ -47,6 +67,7 @@ function mapDoc(doc, metaHorasDia = 8) {
     data: d.data,
     hora_entrada: ajustarFusoHorario(entrada) || '-',
     hora_saida: ajustarFusoHorario(saida) || '-',
+    hora_saida_ideal,
     pausas,
     total_horas: formatarMinutosParaHoras(minutosTrabalhados),
     total_pausas: formatarTotalPausas(d.total_pausas),
