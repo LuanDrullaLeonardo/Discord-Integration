@@ -1,5 +1,49 @@
 const db = require("../config/firebase");
 const dayjs = require("dayjs");
+const nodemailer = require("nodemailer");
+
+async function enviarEmailSolicitacaoFerias(usuario, dataInicio, dataFim) {
+  try {
+    const [adminsSnap, rhSnap] = await Promise.all([
+      db.collection("users").where("role", "==", "admin").where("receberNotificacoes", "==", true).get(),
+      db.collection("users").where("role", "==", "rh").where("receberNotificacoes", "==", true).get(),
+    ]);
+
+    const emails = [
+      ...adminsSnap.docs.map(d => d.data().email),
+      ...rhSnap.docs.map(d => d.data().email),
+    ].filter(Boolean);
+
+    if (emails.length === 0) return;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: process.env.EMAIL_SISTEMA, pass: process.env.EMAIL_SENHA },
+    });
+
+    await transporter.sendMail({
+      from: `"Pontobot" <${process.env.EMAIL_SISTEMA}>`,
+      to: emails.join(","),
+      subject: `🌴 Solicitação de férias — ${usuario}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9;">
+          <h2 style="color: #5a40b6;">🌴 Nova Solicitação de Férias</h2>
+          <p><strong>Colaborador:</strong> ${usuario}</p>
+          <p><strong>Período:</strong> ${dayjs(dataInicio).format("DD/MM/YYYY")} até ${dayjs(dataFim).format("DD/MM/YYYY")}</p>
+          <p><strong>Dias:</strong> ${dayjs(dataFim).diff(dayjs(dataInicio), "day") + 1} dias corridos</p>
+          <p style="margin-top: 20px;">
+            <a href="https://goepik-ponto.vercel.app/vacations" target="_blank"
+              style="display:inline-block;padding:10px 20px;background-color:#5a40b6;color:white;text-decoration:none;border-radius:8px;font-weight:bold;">
+              ➡️ Revisar solicitação
+            </a>
+          </p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.warn("⚠️ Erro ao enviar email de férias:", err.message);
+  }
+}
 
 const STATUS_VALIDOS = ["pendente", "aprovado", "reprovado"];
 
@@ -11,18 +55,22 @@ exports.listarFerias = async (req, res) => {
     const { role, email } = req.user;
     const isAdminOrRH = role === "admin" || role === "rh";
 
-    let query = db.collection("ferias").orderBy("dataInicio", "desc");
+    let snap;
 
-    if (!isAdminOrRH) {
+    if (isAdminOrRH) {
+      snap = await db.collection("ferias").orderBy("dataInicio", "desc").get();
+    } else {
       const userSnap = await db.collection("users").where("email", "==", email).limit(1).get();
       if (userSnap.empty) return res.status(403).json({ error: "Usuário não encontrado." });
       const discordId = userSnap.docs[0].data().discordId;
       if (!discordId) return res.json([]);
-      query = db.collection("ferias").where("discordId", "==", discordId).orderBy("dataInicio", "desc");
+      // Sem orderBy para evitar necessidade de índice composto no Firestore
+      snap = await db.collection("ferias").where("discordId", "==", discordId).get();
     }
 
-    const snap = await query.get();
-    const ferias = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const ferias = snap.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => (a.dataInicio < b.dataInicio ? 1 : -1));
     res.json(ferias);
   } catch (error) {
     console.error("Erro ao listar férias:", error);
@@ -71,9 +119,11 @@ exports.solicitarFerias = async (req, res) => {
       }
     }
 
+    const nomeExibicao = userData.displayName || userData.usuario || email.split("@")[0];
+
     const ref = await db.collection("ferias").add({
       discordId: userData.discordId,
-      usuario: userData.usuario || email.split("@")[0],
+      usuario: nomeExibicao,
       email,
       dataInicio,
       dataFim,
@@ -83,6 +133,8 @@ exports.solicitarFerias = async (req, res) => {
       criadoEm: new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     });
+
+    await enviarEmailSolicitacaoFerias(nomeExibicao, dataInicio, dataFim);
 
     const io = req.app.get("io");
     io.emit("ferias-atualizadas");
