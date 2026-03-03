@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/config/firebase'
 import { fetchSpecialDates, addSpecialDate, deleteSpecialDate } from '@/services/specialDateService'
 import { useToast } from '@/composables/useToast'
 import Card from '@/components/ui/Card.vue'
@@ -13,6 +15,7 @@ import dayjs from 'dayjs'
 
 const { toast } = useToast()
 const dates = ref([])
+const users = ref([])
 const loading = ref(true)
 const saving = ref(false)
 
@@ -20,10 +23,11 @@ const form = ref({
   data: '',
   descricao: '',
   tipo: 'feriado',
+  usuarioDiscordId: '',
 })
 
 onMounted(async () => {
-  await loadDates()
+  await Promise.all([loadDates(), loadUsers()])
 })
 
 const loadDates = async () => {
@@ -37,15 +41,29 @@ const loadDates = async () => {
   }
 }
 
+const loadUsers = async () => {
+  try {
+    const snap = await getDocs(collection(db, 'users'))
+    users.value = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(u => u.role === 'leitor')
+      .sort((a, b) => (a.displayName || a.usuario || '').localeCompare(b.displayName || b.usuario || ''))
+  } catch {
+    // silencioso — select ficará vazio
+  }
+}
+
 const TIPO_VARIANT = {
   'feriado': 'destructive',
   'ponto-facultativo': 'warning',
+  'day_off': 'default',
   'outro': 'secondary',
 }
 
 const TIPO_LABEL = {
   'feriado': 'Feriado',
   'ponto-facultativo': 'Ponto Facultativo',
+  'day_off': 'Day Off',
   'outro': 'Outro',
 }
 
@@ -54,11 +72,16 @@ const handleAdd = async () => {
     toast({ type: 'warning', title: 'Atenção', message: 'Preencha todos os campos.' })
     return
   }
+  if (form.value.tipo === 'day_off' && !form.value.usuarioDiscordId) {
+    toast({ type: 'warning', title: 'Atenção', message: 'Selecione o colaborador para o Day Off.' })
+    return
+  }
   saving.value = true
   try {
-    await addSpecialDate(form.value)
+    const usuarios = form.value.tipo === 'day_off' ? [form.value.usuarioDiscordId] : []
+    await addSpecialDate({ ...form.value, usuarios })
     toast({ type: 'success', title: 'Sucesso', message: 'Data adicionada.' })
-    form.value = { data: '', descricao: '', tipo: 'feriado' }
+    form.value = { data: '', descricao: '', tipo: 'feriado', usuarioDiscordId: '' }
     await loadDates()
   } catch {
     toast({ type: 'error', title: 'Erro', message: 'Falha ao adicionar data.' })
@@ -69,13 +92,17 @@ const handleAdd = async () => {
 
 const handleDelete = async (item) => {
   try {
-    // DELETE /datas-especiais/:data — passa a data como parâmetro de rota
     await deleteSpecialDate(item.data)
     toast({ type: 'success', title: 'Removido', message: 'Data removida.' })
     await loadDates()
   } catch {
     toast({ type: 'error', title: 'Erro', message: 'Falha ao remover data.' })
   }
+}
+
+const nomeUsuario = (discordId) => {
+  const u = users.value.find(u => u.discordId === discordId)
+  return u ? (u.displayName || u.usuario || discordId) : discordId
 }
 </script>
 
@@ -111,7 +138,20 @@ const handleDelete = async (item) => {
           >
             <option value="feriado">Feriado</option>
             <option value="ponto-facultativo">Ponto Facultativo</option>
+            <option value="day_off">Day Off</option>
             <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div v-if="form.tipo === 'day_off'" class="space-y-1.5 sm:col-span-3">
+          <Label>Colaborador *</Label>
+          <select
+            v-model="form.usuarioDiscordId"
+            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="" disabled>Selecione o colaborador</option>
+            <option v-for="u in users" :key="u.discordId" :value="u.discordId">
+              {{ u.displayName || u.usuario || u.email }}
+            </option>
           </select>
         </div>
       </div>
@@ -139,13 +179,16 @@ const handleDelete = async (item) => {
         >
           <div>
             <div class="flex items-center gap-2">
-              <p class="text-sm font-medium text-foreground">{{ item.descricao }}</p>
-              <Badge :variant="TIPO_VARIANT[item.tipo] ?? 'secondary'" class="text-xs">
-                {{ TIPO_LABEL[item.tipo] ?? item.tipo }}
+              <p class="text-sm font-medium text-foreground">{{ item.nome ?? item.descricao }}</p>
+              <Badge :variant="TIPO_VARIANT[item.tipo || 'feriado']" class="text-xs">
+                {{ TIPO_LABEL[item.tipo || 'feriado'] }}
               </Badge>
             </div>
             <p class="text-xs text-muted-foreground mt-0.5">
               {{ dayjs(item.data).format('DD/MM/YYYY') }}
+              <span v-if="item.tipo === 'day_off' && item.usuarios?.length">
+                — {{ item.usuarios.map(nomeUsuario).join(', ') }}
+              </span>
             </p>
           </div>
           <Button

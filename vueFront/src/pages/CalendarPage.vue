@@ -21,20 +21,17 @@ const anoMes = computed(() => {
   return { ano: d.year(), mes: d.month() + 1 }
 })
 
-const CORES_FERIAS = [
-  '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
-  '#10b981', '#06b6d4', '#f97316', '#6366f1',
-]
+const TOTAL_CORES = 8
 
-// Mapeia cada usuário para uma cor fixa
+// Mapeia cada usuário para um índice de cor fixo
 const coresUsuarios = {}
 let corIdx = 0
-function corParaUsuario(usuario) {
-  if (!coresUsuarios[usuario]) {
-    coresUsuarios[usuario] = CORES_FERIAS[corIdx % CORES_FERIAS.length]
+function classeParaUsuario(usuario) {
+  if (coresUsuarios[usuario] === undefined) {
+    coresUsuarios[usuario] = corIdx % TOTAL_CORES
     corIdx++
   }
-  return coresUsuarios[usuario]
+  return `evento-ferias evento-ferias-${coresUsuarios[usuario]}`
 }
 
 async function carregarEventos() {
@@ -52,24 +49,20 @@ async function carregarEventos() {
     // Feriados — dia inteiro, cor cinza/âmbar conforme tipo
     for (const f of feriados) {
       evs.push({
-        start: f.data,
-        end: f.data,
+        start: `${f.data} 00:00`,
+        end: `${f.data} 23:59`,
         title: f.nome,
-        allDay: true,
-        class: f.tipo === 'feriado' ? 'evento-feriado' : 'evento-facultativo',
+        class: (f.tipo || 'feriado') === 'feriado' ? 'evento-feriado' : f.tipo === 'day_off' ? 'evento-dayoff' : 'evento-facultativo',
       })
     }
 
     // Férias — período colorido por colaborador
     for (const f of ferias) {
-      const cor = corParaUsuario(f.usuario)
       evs.push({
-        start: f.dataInicio,
-        end: f.dataFim,
+        start: `${f.dataInicio} 00:00`,
+        end: `${f.dataFim} 23:59`,
         title: `🌴 ${f.usuario}`,
-        allDay: true,
-        style: `background: ${cor}; border-color: ${cor};`,
-        class: 'evento-ferias',
+        class: classeParaUsuario(f.usuario),
       })
     }
 
@@ -81,8 +74,15 @@ async function carregarEventos() {
   }
 }
 
-function onViewChange({ startDate }) {
-  activeDate.value = dayjs(startDate).add(15, 'day').format('YYYY-MM-DD')
+function onViewChange({ startDate, endDate }) {
+  // Usa o ponto médio entre início e fim da view para detectar o mês correto
+  // independente da view (mês, semana, dia) — evita empurrar para mês seguinte
+  // na última semana do mês quando somamos dias fixos ao startDate
+  const mid = dayjs(startDate).add(
+    Math.floor(dayjs(endDate).diff(dayjs(startDate), 'day') / 2),
+    'day'
+  )
+  activeDate.value = mid.format('YYYY-MM-DD')
 }
 
 onMounted(carregarEventos)
@@ -109,6 +109,9 @@ watch(anoMes, carregarEventos)
       </span>
       <span class="flex items-center gap-1.5">
         <span class="inline-block w-3 h-3 rounded-sm bg-yellow-400"></span> Ponto Facultativo
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block w-3 h-3 rounded-sm bg-green-500"></span> Day Off
       </span>
       <span class="flex items-center gap-1.5">
         <span class="inline-block w-3 h-3 rounded-sm bg-blue-400"></span> Férias (cor por colaborador)
@@ -216,8 +219,23 @@ watch(anoMes, carregarEventos)
   color: white !important;
 }
 
+.vuecal--goepik .evento-dayoff {
+  background: #22c55e !important;
+  border-color: #16a34a !important;
+  color: white !important;
+}
+
 .vuecal--goepik .evento-ferias {
   color: white !important;
   font-weight: 500;
 }
+
+.vuecal--goepik .evento-ferias-0 { background: #3b82f6 !important; border-color: #3b82f6 !important; }
+.vuecal--goepik .evento-ferias-1 { background: #8b5cf6 !important; border-color: #8b5cf6 !important; }
+.vuecal--goepik .evento-ferias-2 { background: #ec4899 !important; border-color: #ec4899 !important; }
+.vuecal--goepik .evento-ferias-3 { background: #f59e0b !important; border-color: #f59e0b !important; }
+.vuecal--goepik .evento-ferias-4 { background: #10b981 !important; border-color: #10b981 !important; }
+.vuecal--goepik .evento-ferias-5 { background: #06b6d4 !important; border-color: #06b6d4 !important; }
+.vuecal--goepik .evento-ferias-6 { background: #f97316 !important; border-color: #f97316 !important; }
+.vuecal--goepik .evento-ferias-7 { background: #6366f1 !important; border-color: #6366f1 !important; }
 </style>
