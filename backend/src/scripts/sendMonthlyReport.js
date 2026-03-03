@@ -14,12 +14,15 @@ const bancoHorasService = require("../services/bancoHoras.service");
 const nodemailer = require("nodemailer");
 
 async function getAdminsToNotify() {
-  const snapshot = await db.collection("users")
-    .where("role", "==", "admin")
-    .where("receberNotificacoes", "==", true)
-    .get();
+  const [adminsSnap, rhSnap] = await Promise.all([
+    db.collection("users").where("role", "==", "admin").where("receberNotificacoes", "==", true).get(),
+    db.collection("users").where("role", "==", "rh").where("receberNotificacoes", "==", true).get(),
+  ]);
 
-  return snapshot.docs.map(doc => doc.data());
+  return [
+    ...adminsSnap.docs.map(doc => doc.data()),
+    ...rhSnap.docs.map(doc => doc.data()),
+  ];
 }
 
 async function gerarArquivoExcel(ano, mes) {

@@ -45,6 +45,45 @@ async function enviarEmailSolicitacaoFerias(usuario, dataInicio, dataFim) {
   }
 }
 
+async function enviarEmailConfirmacaoFerias(emailDestinatario, usuario, dataInicio, dataFim, status, observacaoAdmin) {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: process.env.EMAIL_SISTEMA, pass: process.env.EMAIL_SENHA },
+    });
+
+    const aprovado = status === "aprovado";
+    const cor = aprovado ? "#28a745" : "#dc3545";
+    const icone = aprovado ? "✅" : "❌";
+    const label = aprovado ? "APROVADAS" : "REPROVADAS";
+
+    await transporter.sendMail({
+      from: `"Pontobot" <${process.env.EMAIL_SISTEMA}>`,
+      to: emailDestinatario,
+      subject: `${icone} Suas férias foram ${label}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2 style="color: ${cor};">${icone} Férias <strong>${label}</strong></h2>
+          <p><strong>Período:</strong> ${dayjs(dataInicio).format("DD/MM/YYYY")} até ${dayjs(dataFim).format("DD/MM/YYYY")}</p>
+          <p><strong>Dias:</strong> ${dayjs(dataFim).diff(dayjs(dataInicio), "day") + 1} dias corridos</p>
+          ${observacaoAdmin ? `
+            <p><strong>Observação do responsável:</strong></p>
+            <blockquote style="background: #f1f1f1; padding: 10px; border-left: 4px solid #5a40b6;">${observacaoAdmin}</blockquote>
+          ` : ""}
+          <p style="margin-top: 20px;">
+            <a href="https://goepik-ponto.vercel.app/vacations" target="_blank"
+              style="display:inline-block;padding:10px 20px;background-color:#5a40b6;color:white;text-decoration:none;border-radius:8px;font-weight:bold;">
+              Ver minhas férias
+            </a>
+          </p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.warn("⚠️ Erro ao enviar email de confirmação de férias:", err.message);
+  }
+}
+
 const STATUS_VALIDOS = ["pendente", "aprovado", "reprovado"];
 
 /**
@@ -79,7 +118,7 @@ exports.listarFerias = async (req, res) => {
 };
 
 /**
- * Solicita férias (leitor) — cria com status pendente
+ * Solicita férias — todos os roles podem solicitar, cria com status pendente
  */
 exports.solicitarFerias = async (req, res) => {
   try {
@@ -167,11 +206,30 @@ exports.atualizarStatusFerias = async (req, res) => {
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error: "Registro de férias não encontrado." });
 
+    // Admin/RH não pode aprovar/reprovar suas próprias férias
+    if (snap.data().email === req.user.email) {
+      return res.status(403).json({ error: "Você não pode alterar o status das suas próprias férias." });
+    }
+
+    const feriasData = snap.data();
+
     await ref.update({
       status,
       observacaoAdmin: observacaoAdmin?.trim() || null,
       atualizadoEm: new Date().toISOString(),
     });
+
+    // Envia email de confirmação ao solicitante (apenas aprovado/reprovado)
+    if (status !== "pendente" && feriasData.email) {
+      await enviarEmailConfirmacaoFerias(
+        feriasData.email,
+        feriasData.usuario,
+        feriasData.dataInicio,
+        feriasData.dataFim,
+        status,
+        observacaoAdmin?.trim() || null
+      );
+    }
 
     const io = req.app.get("io");
     io.emit("ferias-atualizadas");
