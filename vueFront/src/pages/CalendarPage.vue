@@ -11,6 +11,8 @@ import dayjs from 'dayjs'
 
 const { toast } = useToast()
 
+const defaultView = window.innerWidth < 640 ? 'week' : 'month'
+
 const activeDate = ref(dayjs().format('YYYY-MM-DD'))
 const loading = ref(false)
 const eventos = ref([])
@@ -93,7 +95,7 @@ watch(anoMes, carregarEventos)
   <div class="space-y-4">
     <!-- Header -->
     <div>
-      <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
+      <h1 class="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
         <CalendarDays class="h-6 w-6 text-primary" />
         Calendário da Equipe
       </h1>
@@ -130,7 +132,7 @@ watch(anoMes, carregarEventos)
       <VueCal
         locale="pt-br"
         :locale-data="ptBr"
-        default-view="month"
+        :default-view="defaultView"
         :time="false"
         :events="eventos"
         :on-event-click="() => {}"
@@ -146,7 +148,13 @@ watch(anoMes, carregarEventos)
 .vuecal--goepik {
   border: none;
   font-family: inherit;
-  min-height: 500px;
+  min-height: 340px;
+}
+
+@media (min-width: 640px) {
+  .vuecal--goepik {
+    min-height: 500px;
+  }
 }
 
 .vuecal--goepik .vuecal__header {
@@ -238,4 +246,32 @@ watch(anoMes, carregarEventos)
 .vuecal--goepik .evento-ferias-5 { background: #06b6d4 !important; border-color: #06b6d4 !important; }
 .vuecal--goepik .evento-ferias-6 { background: #f97316 !important; border-color: #f97316 !important; }
 .vuecal--goepik .evento-ferias-7 { background: #6366f1 !important; border-color: #6366f1 !important; }
+
+/* Mobile: week view compacta */
+@media (max-width: 639px) {
+  .vuecal--goepik .vuecal__heading {
+    font-size: 0.6rem;
+    padding: 0 2px;
+  }
+
+  .vuecal--goepik .vuecal__cell-date {
+    font-size: 0.65rem;
+  }
+
+  .vuecal--goepik .vuecal__event {
+    font-size: 0.6rem;
+    padding: 1px 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vuecal--goepik .vuecal__title-bar {
+    font-size: 0.85rem;
+  }
+
+  .vuecal--goepik .vuecal__arrow {
+    width: 24px;
+  }
+}
 </style>

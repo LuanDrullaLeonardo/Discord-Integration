@@ -177,133 +177,130 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
       </div>
     </Card>
 
-    <!-- Tabela -->
+    <!-- Lista -->
     <Card class="overflow-hidden">
       <div v-if="loading" class="p-4 space-y-3">
-        <Skeleton v-for="i in 5" :key="i" class="h-12 w-full" />
+        <Skeleton v-for="i in 5" :key="i" class="h-16 w-full" />
       </div>
 
-      <div v-else-if="ferias.length" class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="border-b border-border bg-muted/50">
-            <tr>
-              <th class="text-left px-4 py-3 font-medium text-muted-foreground w-8"></th>
-              <th v-if="auth.isAdminOrRH" class="text-left px-4 py-3 font-medium text-muted-foreground">Colaborador</th>
-              <th class="text-left px-4 py-3 font-medium text-muted-foreground">Período</th>
-              <th class="text-left px-4 py-3 font-medium text-muted-foreground">Dias</th>
-              <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-              <th class="text-left px-4 py-3 font-medium text-muted-foreground">Ações</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border">
-            <template v-for="item in ferias" :key="item.id">
-              <tr class="hover:bg-muted/30 transition-colors">
-                <!-- Expand -->
-                <td class="px-4 py-3">
-                  <button @click="toggleRow(item.id)" class="text-muted-foreground hover:text-foreground">
-                    <ChevronDown v-if="!expandedRows.has(item.id)" class="h-4 w-4" />
-                    <ChevronUp v-else class="h-4 w-4" />
-                  </button>
-                </td>
-                <!-- Colaborador (admin) -->
-                <td v-if="auth.isAdminOrRH" class="px-4 py-3 text-foreground font-medium">
-                  {{ item.usuario }}
-                </td>
-                <!-- Período -->
-                <td class="px-4 py-3 text-foreground font-mono">
-                  {{ dayjs(item.dataInicio).format('DD/MM/YYYY') }} – {{ dayjs(item.dataFim).format('DD/MM/YYYY') }}
-                </td>
-                <!-- Dias -->
-                <td class="px-4 py-3 text-foreground">
-                  {{ diasCorridos(item.dataInicio, item.dataFim) }} dias
-                </td>
-                <!-- Status -->
-                <td class="px-4 py-3">
-                  <Badge :variant="statusVariant(item.status)">{{ item.status }}</Badge>
-                </td>
-                <!-- Ações -->
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1">
-                    <!-- Admin: aprovar/reprovar pendentes -->
-                    <template v-if="auth.isAdminOrRH && item.status === 'pendente'">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        class="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
-                        :loading="loadingStatusId === item.id"
-                        @click="handleStatus(item.id, 'aprovado')"
-                      >
-                        <Check class="h-4 w-4" />
-                        Aprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        class="border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                        :loading="loadingStatusId === item.id"
-                        @click="handleStatus(item.id, 'reprovado')"
-                      >
-                        <XCircle class="h-4 w-4" />
-                        Reprovar
-                      </Button>
-                    </template>
-                    <!-- Admin: reabrir reprovado como pendente -->
-                    <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado'">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        :loading="loadingStatusId === item.id"
-                        @click="handleStatus(item.id, 'pendente')"
-                      >
-                        Reabrir
-                      </Button>
-                    </template>
-                    <!-- Leitor: cancelar pendente -->
-                    <Button
-                      v-if="!auth.isAdminOrRH && item.status === 'pendente'"
-                      size="sm"
-                      variant="ghost"
-                      class="text-muted-foreground hover:text-destructive"
-                      @click="handleDelete(item)"
-                    >
-                      <Trash2 class="h-4 w-4" />
-                      Cancelar
-                    </Button>
-                    <!-- Admin: remover qualquer -->
-                    <Button
-                      v-if="auth.isAdminOrRH"
-                      size="sm"
-                      variant="ghost"
-                      class="text-muted-foreground hover:text-destructive"
-                      @click="handleDelete(item)"
-                    >
-                      <Trash2 class="h-4 w-4" />
-                    </Button>
-                  </div>
-                </td>
+      <template v-else-if="ferias.length">
+        <!-- Tabela: md e acima -->
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="border-b border-border bg-muted/50">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium text-muted-foreground w-8"></th>
+                <th v-if="auth.isAdminOrRH" class="text-left px-4 py-3 font-medium text-muted-foreground">Colaborador</th>
+                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Período</th>
+                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Dias</th>
+                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Ações</th>
               </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <template v-for="item in ferias" :key="item.id">
+                <tr class="hover:bg-muted/30 transition-colors">
+                  <td class="px-4 py-3">
+                    <button @click="toggleRow(item.id)" class="text-muted-foreground hover:text-foreground">
+                      <ChevronDown v-if="!expandedRows.has(item.id)" class="h-4 w-4" />
+                      <ChevronUp v-else class="h-4 w-4" />
+                    </button>
+                  </td>
+                  <td v-if="auth.isAdminOrRH" class="px-4 py-3 text-foreground font-medium">{{ item.usuario }}</td>
+                  <td class="px-4 py-3 text-foreground font-mono">
+                    {{ dayjs(item.dataInicio).format('DD/MM/YYYY') }} – {{ dayjs(item.dataFim).format('DD/MM/YYYY') }}
+                  </td>
+                  <td class="px-4 py-3 text-foreground">{{ diasCorridos(item.dataInicio, item.dataFim) }} dias</td>
+                  <td class="px-4 py-3">
+                    <Badge :variant="statusVariant(item.status)">{{ item.status }}</Badge>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-1">
+                      <template v-if="auth.isAdminOrRH && item.status === 'pendente'">
+                        <Button size="sm" variant="outline" class="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'aprovado')">
+                          <Check class="h-4 w-4" /> Aprovar
+                        </Button>
+                        <Button size="sm" variant="outline" class="border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'reprovado')">
+                          <XCircle class="h-4 w-4" /> Reprovar
+                        </Button>
+                      </template>
+                      <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado'">
+                        <Button size="sm" variant="outline" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'pendente')">Reabrir</Button>
+                      </template>
+                      <Button v-if="!auth.isAdminOrRH && item.status === 'pendente'" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
+                        <Trash2 class="h-4 w-4" /> Cancelar
+                      </Button>
+                      <Button v-if="auth.isAdminOrRH" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
+                        <Trash2 class="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="expandedRows.has(item.id)" class="bg-muted/20">
+                  <td :colspan="auth.isAdminOrRH ? 6 : 5" class="px-8 py-3">
+                    <div class="space-y-1 text-xs text-muted-foreground">
+                      <p v-if="item.observacao"><span class="font-medium">Observação:</span> {{ item.observacao }}</p>
+                      <p v-if="item.observacaoAdmin"><span class="font-medium">Obs. admin:</span> {{ item.observacaoAdmin }}</p>
+                      <p><span class="font-medium">Solicitado em:</span> {{ dayjs(item.criadoEm).format('DD/MM/YYYY HH:mm') }}</p>
+                      <p v-if="!item.observacao && !item.observacaoAdmin" class="italic">Sem observações.</p>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
 
-              <!-- Linha expandida: observações -->
-              <tr v-if="expandedRows.has(item.id)" class="bg-muted/20">
-                <td :colspan="auth.isAdminOrRH ? 6 : 5" class="px-8 py-3">
-                  <div class="space-y-1 text-xs text-muted-foreground">
-                    <p v-if="item.observacao">
-                      <span class="font-medium">Observação:</span> {{ item.observacao }}
-                    </p>
-                    <p v-if="item.observacaoAdmin">
-                      <span class="font-medium">Obs. admin:</span> {{ item.observacaoAdmin }}
-                    </p>
-                    <p>
-                      <span class="font-medium">Solicitado em:</span> {{ dayjs(item.criadoEm).format('DD/MM/YYYY HH:mm') }}
-                    </p>
-                    <p v-if="!item.observacao && !item.observacaoAdmin" class="italic">Sem observações.</p>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+        <!-- Cards: mobile (< md) -->
+        <div class="md:hidden divide-y divide-border">
+          <div v-for="item in ferias" :key="item.id" class="p-4 space-y-3">
+            <!-- Linha principal -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="space-y-1 min-w-0">
+                <p v-if="auth.isAdminOrRH" class="text-sm font-semibold text-foreground truncate">{{ item.usuario }}</p>
+                <p class="text-sm text-foreground">
+                  {{ dayjs(item.dataInicio).format('DD/MM/YY') }} – {{ dayjs(item.dataFim).format('DD/MM/YY') }}
+                  <span class="text-muted-foreground text-xs ml-1">({{ diasCorridos(item.dataInicio, item.dataFim) }} dias)</span>
+                </p>
+                <Badge :variant="statusVariant(item.status)" class="text-xs">{{ item.status }}</Badge>
+              </div>
+              <button @click="toggleRow(item.id)" class="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
+                <ChevronDown v-if="!expandedRows.has(item.id)" class="h-4 w-4" />
+                <ChevronUp v-else class="h-4 w-4" />
+              </button>
+            </div>
+
+            <!-- Expandido: observações -->
+            <div v-if="expandedRows.has(item.id)" class="space-y-1 text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2">
+              <p v-if="item.observacao"><span class="font-medium">Observação:</span> {{ item.observacao }}</p>
+              <p v-if="item.observacaoAdmin"><span class="font-medium">Obs. admin:</span> {{ item.observacaoAdmin }}</p>
+              <p><span class="font-medium">Solicitado em:</span> {{ dayjs(item.criadoEm).format('DD/MM/YYYY HH:mm') }}</p>
+              <p v-if="!item.observacao && !item.observacaoAdmin" class="italic">Sem observações.</p>
+            </div>
+
+            <!-- Ações -->
+            <div class="flex flex-wrap gap-2">
+              <template v-if="auth.isAdminOrRH && item.status === 'pendente'">
+                <Button size="sm" variant="outline" class="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'aprovado')">
+                  <Check class="h-4 w-4" /> Aprovar
+                </Button>
+                <Button size="sm" variant="outline" class="border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'reprovado')">
+                  <XCircle class="h-4 w-4" /> Reprovar
+                </Button>
+              </template>
+              <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado'">
+                <Button size="sm" variant="outline" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'pendente')">Reabrir</Button>
+              </template>
+              <Button v-if="!auth.isAdminOrRH && item.status === 'pendente'" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
+                <Trash2 class="h-4 w-4" /> Cancelar
+              </Button>
+              <Button v-if="auth.isAdminOrRH" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
+                <Trash2 class="h-4 w-4" /> Remover
+              </Button>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <div v-else class="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
         <Palmtree class="h-10 w-10 opacity-30" />

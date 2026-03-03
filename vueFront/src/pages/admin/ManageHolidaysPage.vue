@@ -109,7 +109,7 @@ const nomeUsuario = (discordId) => {
 <template>
   <div class="space-y-4">
     <div>
-      <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
+      <h1 class="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
         <CalendarDays class="h-6 w-6 text-primary" />
         Gerenciar Feriados
       </h1>
@@ -121,7 +121,7 @@ const nomeUsuario = (discordId) => {
     <!-- Add form -->
     <Card class="p-4">
       <h3 class="font-medium text-sm text-foreground mb-4">Adicionar Nova Data</h3>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div class="space-y-1.5">
           <Label>Data *</Label>
           <Input v-model="form.data" type="date" />
@@ -175,12 +175,12 @@ const nomeUsuario = (discordId) => {
         <div
           v-for="item in dates"
           :key="item.id ?? item.data"
-          class="flex items-center justify-between px-4 py-3 hover:bg-muted/30"
+          class="flex items-start justify-between gap-2 px-4 py-3 hover:bg-muted/30"
         >
-          <div>
-            <div class="flex items-center gap-2">
-              <p class="text-sm font-medium text-foreground">{{ item.nome ?? item.descricao }}</p>
-              <Badge :variant="TIPO_VARIANT[item.tipo || 'feriado']" class="text-xs">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="text-sm font-medium text-foreground truncate">{{ item.nome ?? item.descricao }}</p>
+              <Badge :variant="TIPO_VARIANT[item.tipo || 'feriado']" class="text-xs shrink-0">
                 {{ TIPO_LABEL[item.tipo || 'feriado'] }}
               </Badge>
             </div>
