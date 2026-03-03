@@ -125,10 +125,10 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
           Férias
         </h1>
         <p class="text-sm text-muted-foreground mt-1">
-          {{ auth.isAdminOrRH ? 'Gerencie as solicitações de férias dos colaboradores.' : 'Solicite e acompanhe suas férias.' }}
+          Solicite e acompanhe férias.{{ auth.isAdminOrRH ? ' Como admin/RH, você também pode aprovar solicitações de outros.' : '' }}
         </p>
       </div>
-      <Button v-if="!auth.isAdminOrRH" size="sm" @click="showForm = !showForm">
+      <Button size="sm" @click="showForm = !showForm">
         <Plus class="h-4 w-4" />
         Solicitar Férias
       </Button>
@@ -144,8 +144,8 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
       </p>
     </div>
 
-    <!-- Formulário de solicitação (leitor) -->
-    <Card v-if="showForm && !auth.isAdminOrRH" class="p-4">
+    <!-- Formulário de solicitação -->
+    <Card v-if="showForm" class="p-4">
       <h3 class="font-medium text-sm text-foreground mb-4">Nova Solicitação</h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1.5">
@@ -216,7 +216,7 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
-                      <template v-if="auth.isAdminOrRH && item.status === 'pendente'">
+                      <template v-if="auth.isAdminOrRH && item.status === 'pendente' && item.email !== auth.user?.email">
                         <Button size="sm" variant="outline" class="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'aprovado')">
                           <Check class="h-4 w-4" /> Aprovar
                         </Button>
@@ -224,10 +224,10 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
                           <XCircle class="h-4 w-4" /> Reprovar
                         </Button>
                       </template>
-                      <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado'">
+                      <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado' && item.email !== auth.user?.email">
                         <Button size="sm" variant="outline" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'pendente')">Reabrir</Button>
                       </template>
-                      <Button v-if="!auth.isAdminOrRH && item.status === 'pendente'" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
+                      <Button v-if="item.status === 'pendente' && item.email === auth.user?.email" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
                         <Trash2 class="h-4 w-4" /> Cancelar
                       </Button>
                       <Button v-if="auth.isAdminOrRH" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
@@ -280,7 +280,7 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
 
             <!-- Ações -->
             <div class="flex flex-wrap gap-2">
-              <template v-if="auth.isAdminOrRH && item.status === 'pendente'">
+              <template v-if="auth.isAdminOrRH && item.status === 'pendente' && item.email !== auth.user?.email">
                 <Button size="sm" variant="outline" class="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'aprovado')">
                   <Check class="h-4 w-4" /> Aprovar
                 </Button>
@@ -288,10 +288,10 @@ const pendentesCount = computed(() => ferias.value.filter(f => f.status === 'pen
                   <XCircle class="h-4 w-4" /> Reprovar
                 </Button>
               </template>
-              <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado'">
+              <template v-else-if="auth.isAdminOrRH && item.status === 'reprovado' && item.email !== auth.user?.email">
                 <Button size="sm" variant="outline" :loading="loadingStatusId === item.id" @click="handleStatus(item.id, 'pendente')">Reabrir</Button>
               </template>
-              <Button v-if="!auth.isAdminOrRH && item.status === 'pendente'" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
+              <Button v-if="item.status === 'pendente' && item.email === auth.user?.email" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
                 <Trash2 class="h-4 w-4" /> Cancelar
               </Button>
               <Button v-if="auth.isAdminOrRH" size="sm" variant="ghost" class="text-muted-foreground hover:text-destructive" @click="handleDelete(item)">
