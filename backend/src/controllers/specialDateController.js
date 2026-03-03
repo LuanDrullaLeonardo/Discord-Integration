@@ -11,7 +11,7 @@ exports.getDatasEspeciais = async (req, res) => {
   }
 };
 
-const TIPOS_VALIDOS = ["feriado", "ponto-facultativo", "outro"];
+const TIPOS_VALIDOS = ["feriado", "ponto-facultativo", "day_off", "outro"];
 
 exports.addDataEspecial = async (req, res) => {
   try {

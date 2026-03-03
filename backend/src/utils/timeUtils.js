@@ -85,8 +85,9 @@ async function getTipoDeDia(dataStr, discordId = null) {
 
       if (usuarios.length === 0 || usuarios.includes(discordId)) {
         const tipo = dados.tipo || "feriado";
-        // ponto-facultativo e outro não removem o dia da meta de horas
-        if (tipo === "feriado") return "feriado";
+        // feriado e day_off removem o dia da meta de horas
+        // ponto-facultativo e outro não removem
+        if (tipo === "feriado" || tipo === "day_off") return "feriado";
         return "util";
       }
     }
