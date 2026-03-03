@@ -83,7 +83,7 @@ const toggleRow = (id) => {
               <th class="text-left px-4 py-3 font-medium text-muted-foreground">E-mail</th>
               <th class="text-left px-4 py-3 font-medium text-muted-foreground">Nome</th>
               <th class="text-left px-4 py-3 font-medium text-muted-foreground">Permissão</th>
-              <th class="text-left px-4 py-3 font-medium text-muted-foreground">Notif. Admin</th>
+              <th class="text-left px-4 py-3 font-medium text-muted-foreground">Notif. Admin/RH</th>
               <th class="text-left px-4 py-3 font-medium text-muted-foreground">Notif. Leitor</th>
             </tr>
           </thead>
@@ -106,11 +106,11 @@ const toggleRow = (id) => {
                 <div class="flex items-center gap-2">
                   <Switch
                     :model-value="!!user.receberNotificacoes"
-                    :disabled="user.role !== 'admin'"
+                    :disabled="user.role !== 'admin' && user.role !== 'rh'"
                     @update:model-value="handleNotifChange(user.id, 'receberNotificacoes', $event)"
                   />
                   <span class="text-xs text-muted-foreground">
-                    {{ user.role !== 'admin' ? 'N/A' : user.receberNotificacoes ? 'Ativo' : 'Inativo' }}
+                    {{ (user.role !== 'admin' && user.role !== 'rh') ? 'N/A' : user.receberNotificacoes ? 'Ativo' : 'Inativo' }}
                   </span>
                 </div>
               </td>
@@ -164,15 +164,15 @@ const toggleRow = (id) => {
 
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-xs text-muted-foreground">Notificações (Admin)</span>
+                <span class="text-xs text-muted-foreground">Notificações (Admin/RH)</span>
                 <div class="flex items-center gap-2">
                   <Switch
                     :model-value="!!user.receberNotificacoes"
-                    :disabled="user.role !== 'admin'"
+                    :disabled="user.role !== 'admin' && user.role !== 'rh'"
                     @update:model-value="handleNotifChange(user.id, 'receberNotificacoes', $event)"
                   />
                   <span class="text-xs text-muted-foreground">
-                    {{ user.role !== 'admin' ? 'N/A' : user.receberNotificacoes ? 'Ativo' : 'Inativo' }}
+                    {{ (user.role !== 'admin' && user.role !== 'rh') ? 'N/A' : user.receberNotificacoes ? 'Ativo' : 'Inativo' }}
                   </span>
                 </div>
               </div>
