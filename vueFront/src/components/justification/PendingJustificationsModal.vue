@@ -6,6 +6,13 @@ import Badge from '@/components/ui/Badge.vue'
 import { X, AlertTriangle } from 'lucide-vue-next'
 import dayjs from 'dayjs'
 
+const TIPO_LABELS = {
+  abono_parcial: 'Abono Parcial',
+  abono_dia: 'Abono do Dia',
+  horas_extras: 'Horas Extras',
+  informativo: 'Informativo',
+}
+
 defineProps({
   pendentes: { type: Array, required: true },
 })
@@ -67,6 +74,14 @@ const handleSaved = () => {
                 <Badge :variant="statusVariant(record.justificativa?.status)" class="shrink-0">
                   {{ record.justificativa?.status ?? 'pendente' }}
                 </Badge>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span v-if="record.justificativa?.tipo" class="text-xs font-medium text-blue-600 dark:text-blue-400">
+                  {{ TIPO_LABELS[record.justificativa.tipo] ?? record.justificativa.tipo }}
+                </span>
+                <span v-if="record.justificativa?.abonoHoras" class="text-xs text-muted-foreground">
+                  · {{ record.justificativa.abonoHoras }}
+                </span>
               </div>
               <p v-if="record.justificativa?.text" class="text-sm text-muted-foreground mt-0.5 line-clamp-2">
                 {{ record.justificativa.text }}

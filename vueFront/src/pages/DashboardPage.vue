@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '@/config/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
-import { fetchRegistrosPaginated } from '@/services/registroService'
+import { fetchRegistrosPaginated, mapDoc } from '@/services/registroService'
 import dayjs from 'dayjs'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -38,7 +38,7 @@ async function carregarPendentes() {
   try {
     const q = query(collection(db, 'registros'), where('justificativa.status', '==', 'pendente'))
     const snap = await getDocs(q)
-    pendentesRecords.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    pendentesRecords.value = snap.docs.map(d => mapDoc(d))
     pendentesCount.value = pendentesRecords.value.length
   } catch {
     // silencioso

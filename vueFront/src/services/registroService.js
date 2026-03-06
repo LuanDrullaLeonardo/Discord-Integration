@@ -24,7 +24,7 @@ function calcularSaidaIdeal(entrada, pausasMinutos, metaHorasDia) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
-function mapDoc(doc, metaHorasDia = 8) {
+export function mapDoc(doc, metaHorasDia = 8) {
   const d = doc.data()
   const entrada = d.entrada
   const saida = d.saida
